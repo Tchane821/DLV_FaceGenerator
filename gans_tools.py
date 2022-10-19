@@ -2,14 +2,17 @@ from matplotlib import pyplot
 from keras.optimizers import adam_v2
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Conv2D, LeakyReLU, Dropout, Reshape, Conv2DTranspose
-from numpy import ones, zeros
+from numpy import ones, zeros, asarray, sum, cov, trace, iscomplexobj
 from numpy.random import randint, randn
+from skimage.transform import resize
+from scipy.linalg import sqrtm
 
 
 def plot_faces(faces, n):
     for i in range(n * n):
         pyplot.subplot(n, n, 1 + i)
         pyplot.axis('off')
+        faces = faces.astype(int)
         pyplot.imshow(faces[i])
     pyplot.show()
 
@@ -127,3 +130,24 @@ def gan_train(g_model, d_model, gan_model, dataset, latent_dim, n_epochs=100, n_
                   (i + 1, j + 1, bat_per_epo, d_loss1, d_loss2, g_loss))
         if (i + 1) % 10 == 0:
             summarize_performance(i, g_model, d_model, dataset, latent_dim)
+
+
+def scale_images(images, new_shape):
+    images_list = list()
+    for image in images:
+        new_image = resize(image, new_shape, 0)
+        images_list.append(new_image)
+    return asarray(images_list)
+
+
+def calculate_fid(model, images1, images2):
+    act1 = model.predict(images1)
+    act2 = model.predict(images2)
+    mu1, sigma1 = act1.mean(axis=0), cov(act1, rowvar=False)
+    mu2, sigma2 = act2.mean(axis=0), cov(act2, rowvar=False)
+    ss_diff = sum((mu1 - mu2) ** 2.0)
+    cov_mean = sqrtm(sigma1.dot(sigma2))
+    if iscomplexobj(cov_mean):
+        cov_mean = cov_mean.real
+    fid = ss_diff + trace(sigma1 + sigma2 - 2.0 * cov_mean)
+    return fid

@@ -1,8 +1,12 @@
 import os
 
 from keras import models
+from keras.applications.inception_v3 import InceptionV3, preprocess_input
 from numpy import load
-from gans_tools import plot_faces, load_real_samples, define_gan, define_generator, define_discriminator, gan_train
+from gans_tools import load_real_samples, define_gan, define_generator, define_discriminator, gan_train
+from gans_tools import generate_real_samples, generate_fake_samples, scale_images, calculate_fid
+
+from gans_tools import plot_faces
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -39,3 +43,31 @@ else:
     # Save modele
     gan_model.save(f"{path_to_data}/generator_model.h5")
     print("Log: Model trained and saved!")
+
+# Modele d'évaluation
+print("Log: Loading InceptionV3 model: In Progresse...")
+eval_model = InceptionV3(include_top=False, pooling='avg', input_shape=(299, 299, 3))
+print("Log: Loading InceptionV3 model: Done!")
+
+# load real and fake images
+n_samples = 1000
+print("Log: Generating fake and real samples: In progress...")
+X_real, _ = generate_real_samples(dataset, n_samples)
+X_fake, _ = generate_fake_samples(g_model, latent_dim, n_samples)
+print("Log: Generating fake and real samples: Done!")
+# scale from [-1,1] to [0,255]
+X_real = X_real * 127.5 + 127.5
+X_fake = X_fake * 127.5 + 127.5
+plot_faces(X_fake, 5)
+# resize images
+X_real = scale_images(X_real, (299, 299, 3))
+X_fake = scale_images(X_fake, (299, 299, 3))
+plot_faces(X_fake, 5)
+# pre-process images
+X_real = preprocess_input(X_real)
+X_fake = preprocess_input(X_fake)
+# fid between real and generated images
+print("Log: Calculating FID: In progress...")
+fid = calculate_fid(eval_model, X_real, X_fake)
+print("Log: Calculating FID: Done!")
+print(f"\tInfo: FID = {fid}")
